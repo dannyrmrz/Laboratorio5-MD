@@ -177,3 +177,58 @@ ggplot(comparacion, aes(x = Modelo, y = RMSE, fill = Modelo)) +
 ```
 
 Al comparar los tres modelos evaluados para predecir el precio de los alojamientos, se observa que el árbol de regresión obtuvo el mejor desempeño con un RMSE de 1939.52, seguido por la regresión lineal con un RMSE de 3011.84, y finalmente el modelo de Naive Bayes con el peor desempeño, alcanzando un RMSE de 4101.57 y un R² de apenas 0.028, lo que indica que solo explica el 2.8% de la variabilidad del precio. El árbol de regresión supera a los otros modelos porque logra capturar relaciones no lineales entre las variables, lo cual es especialmente relevante en datos de precios con alta variabilidad. La regresión lineal asume linealidad y por ello pierde precisión, mientras que Naive Bayes, al estar diseñado originalmente para clasificación, no es adecuado para predicción de valores continuos como el precio.
+
+## Modelo de clasificación
+
+```{r variable de respuesta}
+listings_clean$price_category <- cut(
+  listings_clean$price,
+  breaks = c(-Inf, 120, 326, Inf),
+  labels = c("Economica", "Intermedia", "Cara")
+)
+
+table(listings_clean$price_category)
+```
+
+```{r separación-test-train}
+features_cls <- listings_clean %>%
+  select(accommodates, bathrooms, bedrooms, beds,
+         minimum_nights, availability_365, number_of_reviews,
+         review_scores_rating, reviews_per_month,
+         room_type, instant_bookable, price_category)
+
+set.seed(123)
+trainIndex_cls <- createDataPartition(features_cls$price_category, p = 0.7, list = FALSE)
+train_cls <- features_cls[trainIndex_cls, ]
+test_cls  <- features_cls[-trainIndex_cls, ]
+```
+
+```{r bayes-clasificación}
+modelo_nb_cls <- naiveBayes(price_category ~ ., data = train_cls)
+```
+
+```{r predicciones clasificacion}
+pred_cls <- predict(modelo_nb_cls, newdata = test_cls)
+```
+
+```{r metricas clasificacion}
+accuracy_cls <- mean(pred_cls == test_cls$price_category)
+accuracy_cls
+
+conf_matrix <- confusionMatrix(pred_cls, test_cls$price_category)
+conf_matrix
+```
+
+```{r visualizacion matriz}
+cm_df <- as.data.frame(conf_matrix$table)
+
+ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 5, fontface = "bold") +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(title = "Matriz de Confusión - Naive Bayes Clasificación",
+       x = "Valor Real", y = "Valor Predicho") +
+  theme_minimal()
+```
+
+Se entrenó un modelo de Naive Bayes para clasificar los alojamientos en las categorías Económica, Intermedia y Cara, excluyendo la variable price para evitar data leakage. El modelo alcanzó una accuracy de 58.85%, clasificando correctamente poco más de la mitad de los casos. La categoría mejor predicha fue Intermedia (6,369 aciertos), mientras que Cara fue la más difícil de clasificar, confundiéndose frecuentemente con Intermedia. Los errores entre categorías extremas fueron bajos, lo que indica que el modelo distingue correctamente los casos más contrastantes. Naive Bayes presenta menor desempeño, lo que se explica por su supuesto de independencia entre variables, el cual no se cumple en este dataset dado que variables como accommodates, bedrooms y bathrooms están correlacionadas.
