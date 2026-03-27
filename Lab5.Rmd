@@ -5,6 +5,8 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+Link Github: https://github.com/dannyrmrz/Laboratorio5-MD.git 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -234,11 +236,9 @@ ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
 Se entrenó un modelo de Naive Bayes para clasificar los alojamientos en las categorías Económica, Intermedia y Cara, excluyendo la variable price para evitar data leakage. El modelo alcanzó una accuracy de 58.85%, clasificando correctamente poco más de la mitad de los casos. La categoría mejor predicha fue Intermedia (6,369 aciertos), mientras que Cara fue la más difícil de clasificar, confundiéndose frecuentemente con Intermedia. Los errores entre categorías extremas fueron bajos, lo que indica que el modelo distingue correctamente los casos más contrastantes. Naive Bayes presenta menor desempeño, lo que se explica por su supuesto de independencia entre variables, el cual no se cumple en este dataset dado que variables como accommodates, bedrooms y bathrooms están correlacionadas.
 
 ```{r eficiencia}
-# Predicción en el conjunto de prueba
 pred_price <- predict(modelo_nb, newdata = test_data)
 pred_price <- as.numeric(as.character(pred_price))
 
-# Cálculo de métricas de eficiencia
 EMA <- mean(abs(test_data$price - pred_price), na.rm = TRUE)
 RMSE_val <- sqrt(mean((test_data$price - pred_price)^2, na.rm = TRUE))
 R_cuadrado <- cor(test_data$price, pred_price)^2
@@ -246,7 +246,6 @@ R_cuadrado <- cor(test_data$price, pred_price)^2
 Lo primero que salta a la vista es que Naive Bayes y la predicción de precios exactos no se llevan nada bien. El modelo de regresión fue un golpe de realidad porque ese R^2 de 0.0278 nos está diciendo, básicamente, que solo estamos explicando el 2.78% de la varianza del precio. Es como si el algoritmo estuviera intentando adivinar el costo de una estancia casi al azar, y eso se confirma con un RMSE de 4101.54, que es un error enorme si lo comparamos con el rango de precios reales de Airbnb. Una posible explicación de este fallo es que Naive Bayes peca de ingenuo al asumir que variables como el número de cuartos, camas y baños no tienen nada que ver entre sí, cuando en el mundo real están totalmente amarradas; al ignorar esa correlación, el modelo pierde toda su puntería para darnos un valor monetario confiable.
 
 ```{r clasificacion}
-# Predicción de clases
 pred_cls <- predict(modelo_nb_cls, newdata = test_cls)
 
 # Matriz de Confusión usando Caret 
@@ -255,4 +254,11 @@ print(cm_final)
 ```
 Cuando pasamos al terreno de la clasificación, la historia cambia un poco y el modelo empieza a sacar la cara. Logramos una precisión general de 58.86%, lo cual suena decente hasta que nos damos cuenta de que el No Information Rate era del 50.19%. Esto significa que nuestro algoritmo apenas le gana a la suerte de predecir siempre la categoría más frecuente por un margen bien pequeño. El valor de Kappa de 0.3549 nos termina de confirmar que, aunque el modelo sí está encontrando ciertos patrones en los datos de SmartStay, todavía hay muchísimo ruido y confusión en sus decisiones.
 
+## Análisis de matriz y métricas
+Al revisar las métricas, observamos que logramos una precisión (Accuracy) del 58.85%. Aunque esto supera al azar, notamos que nuestro modelo apenas le gana por un 8% al No Information Rate (50.19%). Esto nos indica que, aunque nuestro algoritmo está aprendiendo patrones, todavía tiene un margen de error considerable. Nuestro valor de Kappa de 0.3549 confirma que tenemos un nivel de acuerdo moderado entre las predicciones y la realidad.
 
+Notamos que nuestra mayor debilidad está en la confusión entre propiedades Económicas e Intermedias. Específicamente, clasificamos erróneamente 3,831 casas intermedias como económicas. Creemos que esto sucede porque los límites de precio que definimos tienen zonas donde las características físicas de las casas son casi idénticas, lo que confunde la "lógica" de Naive Bayes. También nos costó identificar las casas Caras, ya que enviamos 2,242 de ellas a la categoría intermedia.
+
+Lo que más nos llamó la atención es que fuimos muy buenos evitando errores extremos. Casi nunca confundimos una casa Cara con una Económica (solo 165 errores) o viceversa (515 errores). Esto nos da tranquilidad, ya que el modelo entiende las diferencias claras entre los extremos del mercado.
+
+Como asesores de SmartStay Advisors, consideramos que el error de clasificar una casa "Cara" como "Intermedia" es el más crítico. Si le sugerimos a un dueño de propiedad un precio de gama media cuando su casa es de lujo, le haríamos perder ingresos potenciales. Por otro lado, clasificar una "Económica" como "Intermedia" podría causar que la propiedad no se alquile por tener un precio fuera de mercado. En conclusión, nuestro modelo nos sirve para una segmentación general, pero para el ajuste fino de precios todavía necesitamos mejorar la puntería.
