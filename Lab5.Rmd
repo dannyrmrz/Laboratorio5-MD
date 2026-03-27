@@ -1,0 +1,143 @@
+---
+title: "Lab5"
+author: "Daniela Ramírez, Adrián Gonzáles y José Ordoñez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Librerías
+```{r}
+library(e1071)   # Naive Bayes
+library(caret)   
+library(dplyr)   
+library(ggplot2) 
+```
+
+## Cargar datos
+```{r}
+load("listings.RData")
+```
+
+## Ver estructura
+```{r}
+str(listings)
+summary(listings)
+```
+
+## Ejercicio 1-2
+
+## Limpiar variable precio
+```{r}
+listings$price <- gsub("\\$", "", listings$price)
+listings$price <- gsub(",", "", listings$price)
+listings$price <- as.numeric(listings$price)
+```
+
+## Limpieza NA de price
+```{r}
+listings <- listings[!is.na(listings$price), ]
+```
+
+## Selección de variables
+```{r}
+listings_clean <- listings %>%
+  select(
+    price,
+    accommodates,
+    bathrooms,
+    bedrooms,
+    beds,
+    minimum_nights,
+    availability_365,
+    number_of_reviews,
+    review_scores_rating,
+    reviews_per_month,
+    room_type,
+    property_type,
+    instant_bookable
+  )
+```
+
+## Limpieza de NA
+```{r}
+listings_clean <- listings_clean %>%
+  mutate(
+    bathrooms = ifelse(is.na(bathrooms), median(bathrooms, na.rm = TRUE), bathrooms),
+    bedrooms = ifelse(is.na(bedrooms), median(bedrooms, na.rm = TRUE), bedrooms),
+    beds = ifelse(is.na(beds), median(beds, na.rm = TRUE), beds),
+    review_scores_rating = ifelse(is.na(review_scores_rating), mean(review_scores_rating, na.rm = TRUE), review_scores_rating),
+    reviews_per_month = ifelse(is.na(reviews_per_month), 0, reviews_per_month)
+  )
+```
+
+## Eliminar outliers
+```{r}
+listings_clean <- listings_clean %>%
+  filter(price < quantile(price, 0.99))
+```
+
+## Variables categóricas
+```{r}
+listings_clean$room_type <- as.factor(listings_clean$room_type)
+listings_clean$property_type <- as.factor(listings_clean$property_type)
+listings_clean$instant_bookable <- as.factor(listings_clean$instant_bookable)
+```
+
+## Train/test split
+```{r}
+set.seed(123)
+
+trainIndex <- createDataPartition(listings$price, p = 0.8, list = FALSE)
+
+train_data <- listings[trainIndex, ]
+test_data  <- listings[-trainIndex, ]
+```
+
+## Naive Bayes
+```{r}
+modelo_nb <- naiveBayes(price ~ ., data = train_data)
+```
+
+## Predicciones
+```{r}
+predicciones <- predict(modelo_nb, newdata = test_data)
+```
+
+## Métricas
+```{r}
+predicciones <- as.numeric(predicciones)
+real <- test_data$price
+
+MAE <- mean(abs(predicciones - real))
+RMSE <- sqrt(mean((predicciones - real)^2))
+R2 <- cor(predicciones, real)^2
+
+MAE
+RMSE
+R2
+```
+El MAE indica que el modelo presenta un error promedio considerable en sus predicciones. El RMSE, al ser mucho mayor, evidencia la presencia de errores grandes, especialmente en valores extremos.
+
+El valor de R² es extremadamente bajo, lo que significa que el modelo únicamente explica aproximadamente el 2.78% de la variabilidad del precio, indicando que no tiene capacidad predictiva significativa.
+
+## Visualización 
+```{r}
+resultados <- data.frame(real = real, pred = predicciones)
+
+ggplot(resultados, aes(x = real, y = pred)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Predicciones vs Valores Reales",
+       x = "Precio Real",
+       y = "Precio Predicho")
+```
+Se construyó un modelo de regresión utilizando Naive Bayes para predecir el precio de las propiedades. Sin embargo, al analizar los resultados obtenidos, se observa que el modelo presenta un bajo desempeño predictivo.
+
+La gráfica de valores reales vs predichos muestra una alta dispersión, lo que indica que las predicciones no siguen la tendencia de los valores reales. Además, el modelo tiende a concentrar las predicciones en un rango limitado, sin capturar adecuadamente los valores extremos.
+
+**Conclusión**
+El modelo de Naive Bayes no es adecuado para problemas de regresión continua en este contexto. Esto se debe a que el algoritmo asume independencia entre variables y no está diseñado para modelar relaciones complejas ni distribuciones continuas como el precio.
