@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Librerías
+
 ```{r}
 library(e1071)   # Naive Bayes
 library(caret)   
@@ -18,11 +19,13 @@ library(ggplot2)
 ```
 
 ## Cargar datos
+
 ```{r}
 load("listings.RData")
 ```
 
 ## Ver estructura
+
 ```{r}
 str(listings)
 summary(listings)
@@ -31,6 +34,7 @@ summary(listings)
 ## Ejercicio 1-2
 
 ## Limpiar variable precio
+
 ```{r}
 listings$price <- gsub("\\$", "", listings$price)
 listings$price <- gsub(",", "", listings$price)
@@ -38,11 +42,13 @@ listings$price <- as.numeric(listings$price)
 ```
 
 ## Limpieza NA de price
+
 ```{r}
 listings <- listings[!is.na(listings$price), ]
 ```
 
 ## Selección de variables
+
 ```{r}
 listings_clean <- listings %>%
   select(
@@ -63,6 +69,7 @@ listings_clean <- listings %>%
 ```
 
 ## Limpieza de NA
+
 ```{r}
 listings_clean <- listings_clean %>%
   mutate(
@@ -75,12 +82,14 @@ listings_clean <- listings_clean %>%
 ```
 
 ## Eliminar outliers
+
 ```{r}
 listings_clean <- listings_clean %>%
   filter(price < quantile(price, 0.99))
 ```
 
 ## Variables categóricas
+
 ```{r}
 listings_clean$room_type <- as.factor(listings_clean$room_type)
 listings_clean$property_type <- as.factor(listings_clean$property_type)
@@ -88,6 +97,7 @@ listings_clean$instant_bookable <- as.factor(listings_clean$instant_bookable)
 ```
 
 ## Train/test split
+
 ```{r}
 set.seed(123)
 
@@ -98,16 +108,19 @@ test_data  <- listings[-trainIndex, ]
 ```
 
 ## Naive Bayes
+
 ```{r}
 modelo_nb <- naiveBayes(price ~ ., data = train_data)
 ```
 
 ## Predicciones
+
 ```{r}
 predicciones <- predict(modelo_nb, newdata = test_data)
 ```
 
 ## Métricas
+
 ```{r}
 predicciones <- as.numeric(predicciones)
 real <- test_data$price
@@ -120,11 +133,13 @@ MAE
 RMSE
 R2
 ```
+
 El MAE indica que el modelo presenta un error promedio considerable en sus predicciones. El RMSE, al ser mucho mayor, evidencia la presencia de errores grandes, especialmente en valores extremos.
 
 El valor de R² es extremadamente bajo, lo que significa que el modelo únicamente explica aproximadamente el 2.78% de la variabilidad del precio, indicando que no tiene capacidad predictiva significativa.
 
-## Visualización 
+## Visualización
+
 ```{r}
 resultados <- data.frame(real = real, pred = predicciones)
 
@@ -135,9 +150,30 @@ ggplot(resultados, aes(x = real, y = pred)) +
        x = "Precio Real",
        y = "Precio Predicho")
 ```
+
 Se construyó un modelo de regresión utilizando Naive Bayes para predecir el precio de las propiedades. Sin embargo, al analizar los resultados obtenidos, se observa que el modelo presenta un bajo desempeño predictivo.
 
 La gráfica de valores reales vs predichos muestra una alta dispersión, lo que indica que las predicciones no siguen la tendencia de los valores reales. Además, el modelo tiende a concentrar las predicciones en un rango limitado, sin capturar adecuadamente los valores extremos.
 
-**Conclusión**
-El modelo de Naive Bayes no es adecuado para problemas de regresión continua en este contexto. Esto se debe a que el algoritmo asume independencia entre variables y no está diseñado para modelar relaciones complejas ni distribuciones continuas como el precio.
+**Conclusión** El modelo de Naive Bayes no es adecuado para problemas de regresión continua en este contexto. Esto se debe a que el algoritmo asume independencia entre variables y no está diseñado para modelar relaciones complejas ni distribuciones continuas como el precio.
+
+## Comparación Naive Bayes, Regresión lineal, Árbol de regresión
+
+```{r comparacion modelos}
+comparacion <- data.frame(
+  Modelo = c("Regresión Lineal", "Árbol de Regresión", "Naive Bayes"),
+  RMSE   = c(3011.84, 1939.52, 4101.57)
+)
+
+comparacion
+
+ggplot(comparacion, aes(x = Modelo, y = RMSE, fill = Modelo)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  geom_text(aes(label = round(RMSE, 2)), vjust = -0.5) +
+  labs(title = "Comparación de RMSE entre modelos",
+       y = "RMSE", x = "Modelo") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Al comparar los tres modelos evaluados para predecir el precio de los alojamientos, se observa que el árbol de regresión obtuvo el mejor desempeño con un RMSE de 1939.52, seguido por la regresión lineal con un RMSE de 3011.84, y finalmente el modelo de Naive Bayes con el peor desempeño, alcanzando un RMSE de 4101.57 y un R² de apenas 0.028, lo que indica que solo explica el 2.8% de la variabilidad del precio. El árbol de regresión supera a los otros modelos porque logra capturar relaciones no lineales entre las variables, lo cual es especialmente relevante en datos de precios con alta variabilidad. La regresión lineal asume linealidad y por ello pierde precisión, mientras que Naive Bayes, al estar diseñado originalmente para clasificación, no es adecuado para predicción de valores continuos como el precio.
