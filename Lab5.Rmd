@@ -262,3 +262,29 @@ Notamos que nuestra mayor debilidad está en la confusión entre propiedades Eco
 Lo que más nos llamó la atención es que fuimos muy buenos evitando errores extremos. Casi nunca confundimos una casa Cara con una Económica (solo 165 errores) o viceversa (515 errores). Esto nos da tranquilidad, ya que el modelo entiende las diferencias claras entre los extremos del mercado.
 
 Como asesores de SmartStay Advisors, consideramos que el error de clasificar una casa "Cara" como "Intermedia" es el más crítico. Si le sugerimos a un dueño de propiedad un precio de gama media cuando su casa es de lujo, le haríamos perder ingresos potenciales. Por otro lado, clasificar una "Económica" como "Intermedia" podría causar que la propiedad no se alquile por tener un precio fuera de mercado. En conclusión, nuestro modelo nos sirve para una segmentación general, pero para el ajuste fino de precios todavía necesitamos mejorar la puntería.
+
+## Análisis de sobreajuste
+Para determinar si nuestro modelos está sobreajustado, comparamos qué tan bien ke fue con los datos que usó para estudiar (entrenamiento) contra los datos que nunca había visto (prueba).
+
+Al analizar los resultados del modelo de Naive Bayes, no creemos que el modelo esté sobreajustado. Normalmente un modelo sobreajustado tiene una precisión perfecta o casi perfecta en el entrenamiento y una muy mala en la prueba. En nuestro caso, la precisión en el conjunto de prueba (58.85%) es bastante modesta y muy similar a lo que observamos durante las fases iniciales. Si estuviéramos sobreajustados, el error de la prueba sería catastrófico.
+Si revisamos nuestra matriz de confusión, vemos que los errores se concentran en las categorías que se traslapan (Económica e Intermedia). Esto por la similitud de datos, no por una memorización excesiva de anomalías del set de entrenamiento.
+
+```{r Diagnostico de sobreajuste}
+pred_train <- predict(modelo_nb_cls, newdata = train_cls)
+acc_train <- mean(pred_train == train_cls$price_category)
+
+acc_test <- accuracy_cls
+
+# Tabla comparativa
+diagnostico <- data.frame( Conjunto = c("Entrenamiento", "Prueba"),
+                           Precision = c(acc_train, acc_test))
+print(diagnostico)
+
+ggplot(diagnostico, aes(x = Conjunto, y = Precision, fill = Conjunto)) +
+  geom_bar(stat = "identity", width = 0.5) + 
+  geom_text(aes(label = round(Precision, 4)), vjust = -0.5) +
+  ylim(0, 1) + 
+  labs(title = "Comparación de Precisión: ¿Existe Sobreajuste?", y = "Exactitud (Accuracy)", x = "") + theme_minimal()
+```
+
+Al no haber mucha diferencia en la precisión de ambos conjuntos, el modelo no está sobreajustado, simplemente carece de la potencia necesaria para clasificar mejor las categorías.
