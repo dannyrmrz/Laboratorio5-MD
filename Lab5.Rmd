@@ -290,6 +290,60 @@ ggplot(diagnostico, aes(x = Conjunto, y = Precision, fill = Conjunto)) +
 
 Al no haber mucha diferencia en la precisión de ambos conjuntos, el modelo no está sobreajustado, simplemente carece de la potencia necesaria para clasificar mejor las categorías.
 
+## Inciso 8
+
+```{r}
+set.seed(123)
+
+# Crear folds
+folds <- createFolds(features_cls$price_category, k = 10)
+
+accuracy_folds <- c()
+
+for(i in 1:10){
+  
+  test_indexes <- folds[[i]]
+  
+  train_fold <- features_cls[-test_indexes, ]
+  test_fold  <- features_cls[test_indexes, ]
+  
+  # Entrenar modelo
+  modelo_fold <- naiveBayes(price_category ~ ., data = train_fold)
+  
+  # Predecir
+  pred_fold <- predict(modelo_fold, newdata = test_fold)
+  
+  # Accuracy
+  acc <- mean(pred_fold == test_fold$price_category)
+  
+  accuracy_folds <- c(accuracy_folds, acc)
+}
+
+# Accuracy promedio
+accuracy_cv <- mean(accuracy_folds)
+
+accuracy_cv
+```
+
+```{r}
+accuracy_folds
+```
+Se implementó una validación cruzada de 10 folds sobre el modelo de Naive Bayes para evaluar su desempeño de manera más robusta. Este procedimiento consiste en dividir el conjunto de datos en 10 subconjuntos, entrenando el modelo en 9 de ellos y evaluándolo en el restante, repitiendo el proceso para cada fold.
+
+## Comparación
+El modelo original sin validación cruzada obtuvo una accuracy de 58.85%, mientras que el modelo con validación cruzada alcanzó una accuracy promedio de 56.29%.
+
+Se observa una ligera disminución en la precisión al aplicar validación cruzada, lo cual indica que el modelo inicial estaba sobreestimando su desempeño.
+
+## Interpretación
+Esta diferencia indica que el modelo original estaba ligeramente sobreestimando su desempeño, ya que evaluaba el modelo con una única partición de los datos.
+
+La validación cruzada proporciona una estimación más confiable del rendimiento del modelo, al evaluar múltiples particiones del dataset. La variabilidad observada entre los folds es baja (entre 55% y 57%), lo que sugiere que el modelo es estable pero limitado en su capacidad predictiva.
+
+## Conclusión
+El modelo con validación cruzada es mejor desde el punto de vista metodológico, ya que ofrece una evaluación más robusta, aunque no necesariamente mayor precisión.
+
+La validación cruzada permitió evidenciar que el desempeño del modelo era consistente pero moderado, confirmando que Naive Bayes presenta limitaciones para este tipo de problema.
 
 ## Ajuste de hiperparametros
 ```{r ajuste-regresion}
