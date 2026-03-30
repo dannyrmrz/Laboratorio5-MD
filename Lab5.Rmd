@@ -288,3 +288,108 @@ ggplot(diagnostico, aes(x = Conjunto, y = Precision, fill = Conjunto)) +
 ```
 
 Al no haber mucha diferencia en la precisión de ambos conjuntos, el modelo no está sobreajustado, simplemente carece de la potencia necesaria para clasificar mejor las categorías.
+
+
+### Ajuste de hiperparametros
+```{r ajuste-regresion}
+# Hiperparametro a modificar: suavizado de laplace
+set.seed(123)
+sample_idx  <- sample(nrow(listings_clean), size = 0.3 * nrow(listings_clean))
+listings_sample <- listings_clean[sample_idx, ]
+
+trainIdx_reg <- createDataPartition(listings_sample$price, p = 0.8, list = FALSE)
+train_reg2   <- listings_sample[trainIdx_reg, ]
+test_reg2    <- listings_sample[-trainIdx_reg, ]
+
+laplace_vals    <- c(0, 0.5, 1, 2, 5)
+resultados_reg  <- data.frame(laplace=numeric(), MAE=numeric(), RMSE=numeric(), R2=numeric())
+
+for (lp in laplace_vals) {
+  modelo_tuned <- naiveBayes(price ~ ., data = train_reg2, laplace = lp)
+  pred_tuned   <- as.numeric(as.character(predict(modelo_tuned, newdata = test_reg2)))
+  real         <- test_reg2$price
+
+  resultados_reg <- rbind(resultados_reg, data.frame(
+    laplace = lp,
+    MAE     = mean(abs(pred_tuned - real), na.rm = TRUE),
+    RMSE    = sqrt(mean((pred_tuned - real)^2, na.rm = TRUE)),
+    R2      = cor(pred_tuned, real, use = "complete.obs")^2
+  ))
+}
+
+print(resultados_reg)
+mejor_reg <- resultados_reg[which.min(resultados_reg$RMSE), ]
+cat("\nMejor configuración (Regresión):\n"); print(mejor_reg)
+```
+Al probar valores de Laplace de {0, 0.5, 1, 2, 5}, el mejor resultado se obtuvo con laplace = 0 (sin suavizado), logrando un RMSE de 1761.22 y un R² de 0.055. Se observa una tendencia clara: conforme aumenta el valor de Laplace, el desempeño empeora progresivamente, el RMSE sube de 1761 a 2258 y el R² cae de 0.055 a 0.017. Esto ocurre porque el suavizado de Laplace introduce probabilidades artificiales para combinaciones no vistas, lo que distorsiona las estimaciones en variables numéricas continuas como el precio.
+
+```{r visualizacion-ajuste-regresion}
+ggplot(resultados_reg, aes(x = factor(laplace), y = RMSE, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_point(data = mejor_reg, aes(x = factor(laplace), y = RMSE),
+             color = "red", size = 5, shape = 8) +
+  labs(title = "Tuneo de Laplace - Modelo de Regresión",
+       subtitle = "Estrella roja = mejor modelo",
+       x = "Valor de Laplace", y = "RMSE") +
+  theme_minimal()
+```
+
+```{r ajuste-clasificacion}
+laplace_vals <- c(0, 0.5, 1, 2, 5)
+
+resultados_cls <- data.frame(
+  laplace  = numeric(),
+  Accuracy = numeric(),
+  Kappa    = numeric()
+)
+
+for (lp in laplace_vals) {
+  modelo_tuned_cls <- naiveBayes(price_category ~ ., data = train_cls, laplace = lp)
+  pred_tuned_cls   <- predict(modelo_tuned_cls, newdata = test_cls)
+
+  cm     <- confusionMatrix(pred_tuned_cls, test_cls$price_category)
+  acc    <- cm$overall["Accuracy"]
+  kappa  <- cm$overall["Kappa"]
+
+  resultados_cls <- rbind(resultados_cls, data.frame(
+    laplace  = lp,
+    Accuracy = acc,
+    Kappa    = kappa
+  ))
+}
+
+print(resultados_cls)
+
+mejor_cls <- resultados_cls[which.max(resultados_cls$Accuracy), ]
+cat("\nMejor configuración (Clasificación):\n")
+print(mejor_cls)
+```
+Al probar valores de Laplace de {0, 0.5, 1, 2, 5}, el mejor resultado se obtuvo con laplace = 2, logrando una Accuracy de 58.86% y un Kappa de 0.3550. Sin embargo, las diferencias entre todos los valores son prácticamente insignificantes — la Accuracy varía apenas en el cuarto decimal (0.5884 a 0.5886).
+
+```{r visualizacion-tuneo-clasificacion}
+ggplot(resultados_cls, aes(x = factor(laplace), y = Accuracy, group = 1)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  geom_point(size = 3, color = "darkgreen") +
+  geom_point(data = mejor_cls, aes(x = factor(laplace), y = Accuracy),
+             color = "red", size = 5, shape = 8) +
+  labs(title = "Tuneo de Laplace - Modelo de Clasificación",
+       subtitle = "Estrella roja = mejor modelo",
+       x = "Valor de Laplace", y = "Accuracy") +
+  theme_minimal()
+```
+
+### Comparación: Modelo Original vs Mejor Modelo Ajustado
+```{r comparacion-final}
+comparacion_tuneo <- data.frame(
+    Modelo   = c("Regresión Original", "Regresión Ajustada",
+                "Clasificación Original", "Clasificación Ajustada"),
+  Metrica  = c("RMSE", "RMSE", "Accuracy", "Accuracy"),
+  Valor    = c(4101.57,
+               mejor_reg$RMSE,
+               0.5885,
+               mejor_cls$Accuracy)
+)
+
+print(comparacion_tuneo)
+```
