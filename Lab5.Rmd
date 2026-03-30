@@ -18,6 +18,7 @@ library(e1071)   # Naive Bayes
 library(caret)   
 library(dplyr)   
 library(ggplot2) 
+library(rpart)
 ```
 
 ## Cargar datos
@@ -290,7 +291,7 @@ ggplot(diagnostico, aes(x = Conjunto, y = Precision, fill = Conjunto)) +
 Al no haber mucha diferencia en la precisión de ambos conjuntos, el modelo no está sobreajustado, simplemente carece de la potencia necesaria para clasificar mejor las categorías.
 
 
-### Ajuste de hiperparametros
+## Ajuste de hiperparametros
 ```{r ajuste-regresion}
 # Hiperparametro a modificar: suavizado de laplace
 set.seed(123)
@@ -393,3 +394,42 @@ comparacion_tuneo <- data.frame(
 
 print(comparacion_tuneo)
 ```
+El tuneo de hiperparámetros no mejoró significativamente ninguno de los dos modelos. En regresión, el mejor valor fue laplace = 0 con un RMSE de 1761.22, pero el R² sigue siendo muy bajo (5.5%), por lo que Naive Bayes sigue sin ser adecuado para predecir precios continuos. En clasificación, las diferencias entre valores de Laplace fueron mínimas, manteniéndose la Accuracy alrededor del 58.85% en todos los casos. La verdadera limitación no es el hiperparámetro, sino el supuesto de independencia del algoritmo.
+
+## Comparación de algoritmos
+```{r comparacion-eficiencia}
+# Tiempos de procesamiento
+tiempo_nb <- system.time(
+  naiveBayes(price_category ~ ., data = train_cls)
+)
+
+tiempo_arbol <- system.time(
+  rpart(price_category ~ ., 
+        data = train_cls, 
+        method = "class",
+        control = rpart.control(maxdepth = 6))
+)
+
+# Tabla comparativa
+comparacion_final <- data.frame(
+  Modelo    = c("Naive Bayes", "Árbol de Clasificación"),
+  Accuracy  = c(0.5886, 0.6896),
+  Kappa     = c(0.3549, NA),
+  Tiempo_seg = c(tiempo_nb["elapsed"], tiempo_arbol["elapsed"])
+)
+
+print(comparacion_final)
+```
+
+```{r visualizacion-comparacion}
+ggplot(comparacion_final, aes(x = Modelo, y = Accuracy, fill = Modelo)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  geom_text(aes(label = round(Accuracy, 4)), vjust = -0.5) +
+  ylim(0, 1) +
+  labs(title = "Comparación de Accuracy: Naive Bayes vs Árbol de Clasificación",
+       y = "Accuracy", x = "") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Al comparar ambos modelos de clasificación, el árbol de decisión supera claramente a Naive Bayes en precisión, alcanzando una Accuracy de 68.96% frente al 58.85% de Naive Bayes, una diferencia de 10 puntos porcentuales. Esto indica que el árbol de decisión es mejor para predecir, ya que logra capturar relaciones no lineales entre variables como accommodates, bathrooms y bedrooms, las cuales están correlacionadas entre sí, algo que Naive Bayes no puede manejar bien debido a su supuesto de independencia.
+En cuanto al tiempo de procesamiento, Naive Bayes fue considerablemente más rápido (0.055 segundos) frente al árbol de clasificación (0.517 segundos), siendo casi 10 veces más lento.
